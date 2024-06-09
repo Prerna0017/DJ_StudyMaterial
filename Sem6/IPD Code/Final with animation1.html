@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Connect Squares for Variables, Values, Functions, and Details</title>
+    <style>
+        canvas {
+            border: 1px solid black;
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="myCanvas" width="2125" height="10000"></canvas>
+    <script>
+        window.onload = function () {
+            var canvas = document.getElementById("myCanvas");
+            var ctx = canvas.getContext("2d");
+
+            // Variables for square positions and sizes
+            var squareWidth = 200;
+            var squareHeight = 70;
+            var squareSpacing = 50; // Spacing between squares
+
+            // Array to hold all square positions
+            var squarePositions = [];
+
+            // Animation parameters
+            var animationSpeed = 2500; // Speed of animation
+            var animationInterval = 750; // Interval for animation in milliseconds
+
+            var jsonData = [
+                {
+                    "type": "variable",
+                    "name": "a",
+                    "value": "10"
+                },
+                {
+                    "type": "variable",
+                    "name": "s",
+                    "value": "20"
+                },
+                {
+                    "type": "variable",
+                    "name": "b",
+                    "value": {
+                        "left": {
+                            "id": "a",
+                            "ctx": {}
+                        },
+                        "op": "-",
+                        "right": {
+                            "value": "5",
+                            "kind": "None"
+                        }
+                    }
+                },
+                {
+                    "type": "variable",
+                    "name": "c",
+                    "value": {
+                        "left": {
+                            "id": "s",
+                            "ctx": {}
+                        },
+                        "op": "+",
+                        "right": {
+                            "value": "2",
+                            "kind": "None"
+                        }
+                    }
+                },
+                {
+                    "type": "function",
+                    "name": "add",
+                    "details": {
+                        "args": [
+                            "x",
+                            "y"
+                        ],
+                        "body": [
+                            {}
+                        ]
+                    }
+                },
+                {
+                    "type": "function",
+                    "name": "subtract",
+                    "details": {
+                        "args": [
+                            "a",
+                            "b"
+                        ],
+                        "body": [
+                            {}
+                        ]
+                    }
+                },
+                {
+                    "type": "class",
+                    "name": "Employee",
+                    "details": {
+                        "attributes": {
+                            "Name": "param1",
+                            "Role": "param2"
+                        },
+                        "functions": {
+                            "Calculate Salary": "function() { // Method body }",
+                            "Add New Employee": "function() { // Method body }"
+                        },
+                        "constructor": "function(param1, param2) { //body }"
+                    }
+                }
+            ];
+
+            // Function to animate adding squares
+            function animateAddition(index) {
+                if (index >= jsonData.length) return; // Stop animation if all squares are added
+
+                var item = jsonData[index];
+                var yOffset = 50; // Initial y offset
+
+                // Calculate the y offset dynamically based on the positions of previously added squares
+                if (squarePositions.length > 0) {
+                    var lastSquare = squarePositions[squarePositions.length - 1];
+                    yOffset = lastSquare.y + squareHeight + squareSpacing;
+                }
+
+                var xOffset = 50; // Default x offset for variables and functions
+
+                // Calculate the x offset for classes to align them properly to the left side
+                if (item.type === "class" && squarePositions.length % 2 === 0) {
+                    xOffset = 50;
+                } else if (item.type === "class" && squarePositions.length % 2 !== 0) {
+                    xOffset = 250;
+                }
+
+                if (item.type === "variable") {
+                    squarePositions.push({
+                        type: item.type,
+                        name: item.name,
+                        value: item.value,
+                        x: xOffset,
+                        y: yOffset,
+                        isDragging: false,
+                        isValueAnimating: false, // New property for value animation
+                        valueX: xOffset + squareWidth + squareSpacing, // Initial x position for value square
+                        valueY: yOffset // Initial y position for value square
+                    });
+
+                    // Animate value square
+                    animateValue(index);
+                } else if (item.type === "function") {
+                    squarePositions.push({
+                        type: item.type,
+                        name: item.name,
+                        details: JSON.stringify(item.details),
+                        x: xOffset,
+                        y: yOffset,
+                        isDragging: false,
+                        isDetailsAnimating: false, // New property for details animation
+                        detailsX: xOffset + squareWidth + squareSpacing, // Initial x position for details square
+                        detailsY: yOffset // Initial y position for details square
+                    });
+
+                    // Animate details square
+                    animateDetails(index);
+                } else if (item.type === "class") {
+                    squarePositions.push({
+                        type: item.type,
+                        name: item.name,
+                        details: item.details,
+                        x: xOffset,
+                        y: yOffset,
+                        isDragging: false,
+                        isDetailsAnimating: false, // New property for details animation
+                        detailsX: xOffset + squareWidth + squareSpacing, // Initial x position for details square
+                        detailsY: yOffset, // Initial y position for details square
+                        isFunctionsAnimating: false, // New property for functions animation
+                        functionsX: xOffset + squareWidth + squareSpacing, // Initial x position for functions square
+                        functionsY: yOffset + squareHeight + squareSpacing, // Initial y position for functions square
+                        isConstructorAnimating: false, // New property for constructor animation
+                        constructorX: xOffset + squareWidth + squareSpacing, // Initial x position for constructor square
+                        constructorY: yOffset + 2 * (squareHeight + squareSpacing) // Initial y position for constructor square
+                    });
+
+                    // Animate details square
+                    animateDetails(index);
+
+                    // Animate functions square
+                    animateFunctions(index);
+
+                    // Animate constructor square
+                    animateConstructor(index);
+                }
+
+                redraw(); // Redraw canvas with new square added
+
+                setTimeout(function () {
+                    animateAddition(index + 1); // Animate addition of next square after a delay
+                }, animationInterval);
+            }
+
+            // Animate the value square
+            function animateValue(index) {
+                var square = squarePositions[index];
+                square.isValueAnimating = true;
+
+                var startX = square.x - squareWidth - squareSpacing; // Initial x position for value square
+                var targetX = square.x + squareWidth + squareSpacing; // Target x position for value square
+
+                square.valueX = startX + 250; // Set initial x position for animation
+
+                var increment = (targetX - startX) / (animationSpeed / 90); // Calculate the increment for smooth movement
+
+                var interval = setInterval(function () {
+                    if (square.valueX >= targetX) {
+                        square.valueX = targetX; // Ensure value square reaches the target position exactly
+                        square.isValueAnimating = false;
+                        clearInterval(interval);
+                    } else {
+                        square.valueX += increment; // Move the value square horizontally to the right
+                        redraw(); // Redraw canvas with updated position
+                    }
+                }, 0); // Use a smaller interval for smoother animation
+            }
+
+
+            // Animate the details square
+            function animateDetails(index) {
+                var square = squarePositions[index];
+                square.isDetailsAnimating = true;
+
+                var startX = square.x - squareWidth - squareSpacing; // Initial x position for details square
+                var targetX = square.x + squareWidth + squareSpacing; // Target x position for details square
+
+                square.detailsX = startX + 250; // Set initial x position for animation
+
+                var increment = (targetX - startX) / (animationSpeed / 40); // Calculate the increment for smooth movement
+
+                var interval = setInterval(function () {
+                    if (square.detailsX >= targetX) {
+                        square.detailsX = targetX; // Ensure details square reaches the target position exactly
+                        square.isDetailsAnimating = false;
+                        clearInterval(interval);
+                    } else {
+                        square.detailsX += increment; // Move the details square horizontally to the right
+                        redraw(); // Redraw canvas with updated position
+                    }
+                }, 10); // Use a smaller interval for smoother animation
+            }
+
+            // Animate the functions square
+            function animateFunctions(index) {
+                var square = squarePositions[index];
+                square.isFunctionsAnimating = true;
+
+                var startX = square.x - squareWidth - squareSpacing; // Initial x position for functions square
+                var startY = square.y - squareHeight - squareSpacing; // Initial y position for functions square
+
+                var targetX = square.x + squareWidth + squareSpacing; // Target x position for functions square
+                var targetY = square.y + squareHeight + squareSpacing; // Target y position for functions square
+
+                square.functionsX = startX + 250; // Set initial x position for animation
+                square.functionsY = startY + 120; // Set initial x position for animation
+
+                var incrementX = (targetX - startX) / (animationSpeed / 40); // Calculate the increment for smooth horizontal movement
+                var incrementY = (targetY - startY) / (animationSpeed / 40); // Calculate the increment for smooth vertical movement
+
+                var interval = setInterval(function () {
+                    if (square.functionsX >= targetX && square.functionsY >= targetY) {
+                        square.functionsX = targetX; // Ensure details square reaches the target position exactly
+                        square.functionsY = targetY; // Ensure details square reaches the target position exactly
+                        square.isFunctionsAnimating = false;
+                        clearInterval(interval);
+                    } else {
+                        if (square.functionsX < targetX) {
+                            square.functionsX += incrementX; // Move the functions square horizontally
+                        }
+                        if (square.functionsY < targetY) {
+                            square.functionsY += incrementY; // Move the functions square vertically
+                        }
+                        redraw(); // Redraw canvas with updated position
+                    }
+                }, 10); // Use a small interval for smoother animation
+            }
+
+            // Animate the constructor square
+            function animateConstructor(index) {
+                var square = squarePositions[index];
+                square.isConstructorAnimating = true;
+
+                var startX = square.x - squareWidth - squareSpacing; // Initial x position for functions square
+                var startY = square.y - squareHeight - squareSpacing; // Initial y position for functions square
+
+                var targetX = square.x + squareWidth + squareSpacing; // Target x position for constructor square
+                var targetY = square.y + 2 * (squareHeight + squareSpacing); // Target y position for constructor square
+
+                square.constructorX = startX + 250; // Set initial x position for animation
+                square.constructorY = startY + 240; // Set initial x position for animation
+
+                var incrementX = (targetX - startX) / (animationSpeed / 40); // Calculate the increment for smooth horizontal movement
+                var incrementY = (targetY - startY) / (animationSpeed / 40); // Calculate the increment for smooth vertical movement
+
+                var interval = setInterval(function () {
+                    if (square.constructorX >= targetX && square.constructorY >= targetY) {
+                        square.constructorX = targetX; // Ensure details square reaches the target position exactly
+                        square.constructorY = targetY; // Ensure details square reaches the target position exactly
+
+                        square.isConstructorAnimating = false;
+                        clearInterval(interval);
+                    } else {
+                        if (square.constructorX < targetX) {
+                            square.constructorX += incrementX; // Move the constructor square horizontally
+                        }
+                        if (square.constructorY < targetY) {
+                            square.constructorY += incrementY; // Move the constructor square vertically
+                        }
+                        redraw(); // Redraw canvas with updated position
+                    }
+                }, 10); // Use a small interval for smoother animation
+            }
+
+            // Function to make components draggable
+            function makeDraggable() {
+                var isDragging = false;
+                var offsetX, offsetY;
+
+                canvas.addEventListener("mousedown", function (e) {
+                    var mouseX = e.clientX - canvas.getBoundingClientRect().left;
+                    var mouseY = e.clientY - canvas.getBoundingClientRect().top;
+
+                    squarePositions.forEach(function (square) {
+                        if (mouseX > square.x && mouseX < square.x + squareWidth && mouseY > square.y && mouseY < square.y + squareHeight) {
+                            isDragging = true;
+                            offsetX = mouseX - square.x;
+                            offsetY = mouseY - square.y;
+                            square.isDragging = true;
+                        }
+                    });
+                });
+
+                canvas.addEventListener("mousemove", function (e) {
+                    if (isDragging) {
+                        var mouseX = e.clientX - canvas.getBoundingClientRect().left;
+                        var mouseY = e.clientY - canvas.getBoundingClientRect().top;
+
+                        squarePositions.forEach(function (square) {
+                            if (square.isDragging) {
+                                square.x = mouseX - offsetX;
+                                square.y = mouseY - offsetY;
+                                redraw();
+                            }
+                        });
+                    }
+                });
+
+                canvas.addEventListener("mouseup", function () {
+                    isDragging = false;
+                    squarePositions.forEach(function (square) {
+                        square.isDragging = false;
+                    });
+                });
+            }
+
+            // Redraw canvas
+            function redraw() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                // Draw squares for each variable-value pair and function
+                squarePositions.forEach(function (square) {
+
+                    if (square.type === "variable") {
+                        drawVariableSquare(square.name, square.x, square.y);
+
+                        if (square.isValueAnimating) {
+                            drawValueSquare(square.name, square.value, square.valueX, square.valueY, "#f4845f"); // Draw value square at animated position
+                            // drawValueSquare(string, square.valueX, square.valueY); // Draw value square at animated position
+                        } else {
+                            drawValueSquare(square.name, square.value, square.x + squareWidth + squareSpacing, square.y, "#f4845f"); // Draw value square at its final position
+                            // drawValueSquare(string, square.x + squareWidth + squareSpacing, square.y); // Draw value square at its final position
+                        }
+                        connectSquares(square.x, square.y, square.x + squareWidth + squareSpacing, square.y);
+                    }
+
+                    else if (square.type === "function") {
+                        drawFunctionSquare(square.name, square.x, square.y);
+                        if (square.isDetailsAnimating) {
+                            drawDetailsSquare(square.details, square.detailsX, square.detailsY, "#f4845f"); // Draw details square at animated position
+                        } else {
+                            drawDetailsSquare(square.details, square.x + squareWidth + squareSpacing, square.y, "#f4845f"); // Draw details square at its final position
+                        }
+                        connectSquares(square.x, square.y, square.x + squareWidth + squareSpacing, square.y);
+                    } else if (square.type === "class") {
+                        // Draw class square
+                        drawClassSquare(square.name, square.x, square.y);
+                        if (square.isDetailsAnimating) {
+                            drawDetailsSquare("Attributes: " + Object.keys(square.details.attributes).join(", "),
+                                square.detailsX, square.detailsY, '#cb6ce6'); // Draw details square at animated position
+                        } else {
+                            drawDetailsSquare("Attributes: " + Object.keys(square.details.attributes).join(", "),
+                                square.x + squareWidth + squareSpacing, square.y, '#cb6ce6'); // Draw details square at its final position
+                        }
+                        connectSquares(square.x, square.y, square.x + squareWidth + squareSpacing, square.y);
+
+                        // Draw squares for class components
+                        var yOffset = square.y + squareHeight + squareSpacing;
+                        var xOffset = square.x + squareWidth + squareSpacing;
+
+                        // Functions
+                        if (square.isFunctionsAnimating) {
+                            drawDetailsSquare("Functions: " + Object.keys(square.details.functions).join(", "),
+                                square.functionsX, square.functionsY, '#cb6ce6'); // Draw functions square at animated position
+                        } else {
+                            drawDetailsSquare("Functions: " + Object.keys(square.details.functions).join(", "),
+                                square.x + squareWidth + squareSpacing, yOffset,'#cb6ce6'); // Draw functions square at its final position
+                        }
+                        connectSquares(square.x, square.y, xOffset, yOffset);
+
+                        // Constructor
+                        yOffset += squareHeight + squareSpacing;
+                        if (square.isConstructorAnimating) {
+                            drawDetailsSquare("Constructor: " + square.details.constructor,
+                                square.constructorX, square.constructorY, '#cb6ce6'); // Draw constructor square at animated position
+                        } else {
+                            drawDetailsSquare("Constructor: " + square.details.constructor,
+                                square.x + squareWidth + squareSpacing, yOffset, '#cb6ce6'); // Draw constructor square at its final position
+                        }
+                        connectSquares(square.x, square.y, xOffset, yOffset);
+                    }
+                });
+            }
+
+            function drawVariableSquare(name, x, y) {
+                // Set square properties
+                var squareBorderColor = "#000000"; // Black border color
+                var squareBorderWidth = 2; // Border width
+                var borderRadius = 10; // Border radius for rounded corners
+
+                // Draw square with black border and rounded corners
+                ctx.fillStyle = "#2a6f97"; // Fill color
+                ctx.strokeStyle = squareBorderColor; // Border color
+                ctx.lineWidth = squareBorderWidth; // Border width
+                ctx.beginPath();
+                ctx.moveTo(x + borderRadius, y); // Move to top-left corner
+                ctx.lineTo(x + squareWidth - borderRadius, y); // Draw top line
+                ctx.quadraticCurveTo(x + squareWidth, y, x + squareWidth, y + borderRadius); // Draw top-right corner curve
+                ctx.lineTo(x + squareWidth, y + squareHeight - borderRadius); // Draw right line
+                ctx.quadraticCurveTo(x + squareWidth, y + squareHeight, x + squareWidth - borderRadius, y + squareHeight); // Draw bottom-right corner curve
+                ctx.lineTo(x + borderRadius, y + squareHeight); // Draw bottom line
+                ctx.quadraticCurveTo(x, y + squareHeight, x, y + squareHeight - borderRadius); // Draw bottom-left corner curve
+                ctx.lineTo(x, y + borderRadius); // Draw left line
+                ctx.quadraticCurveTo(x, y, x + borderRadius, y); // Draw top-left corner curve
+                ctx.closePath(); // Close path
+                ctx.fill(); // Fill square
+                ctx.stroke(); // Draw border
+
+                // Draw text
+                ctx.fillStyle = "white";
+                ctx.font = "bold 25px Poppins";
+                ctx.fillText(name, x + 20, y + 40);
+            }
+
+
+
+            function drawValueSquare(name, value, x, y) {
+                // Set square properties
+                var squareBorderColor = "#000000"; // Black border color
+                var squareBorderWidth = 2; // Border width
+                var borderRadius = 10; // Border radius for rounded corners
+
+                // Draw square with black border and rounded corners
+                ctx.fillStyle = "#2ec4b6"; // Fill color
+                ctx.strokeStyle = squareBorderColor; // Border color
+                ctx.lineWidth = squareBorderWidth; // Border width
+                ctx.beginPath();
+                ctx.moveTo(x + borderRadius, y); // Move to top-left corner
+                ctx.lineTo(x + squareWidth - borderRadius, y); // Draw top line
+                ctx.quadraticCurveTo(x + squareWidth, y, x + squareWidth, y + borderRadius); // Draw top-right corner curve
+                ctx.lineTo(x + squareWidth, y + squareHeight - borderRadius); // Draw right line
+                ctx.quadraticCurveTo(x + squareWidth, y + squareHeight, x + squareWidth - borderRadius, y + squareHeight); // Draw bottom-right corner curve
+                ctx.lineTo(x + borderRadius, y + squareHeight); // Draw bottom line
+                ctx.quadraticCurveTo(x, y + squareHeight, x, y + squareHeight - borderRadius); // Draw bottom-left corner curve
+                ctx.lineTo(x, y + borderRadius); // Draw left line
+                ctx.quadraticCurveTo(x, y, x + borderRadius, y); // Draw top-left corner curve
+                ctx.closePath(); // Close path
+                ctx.fill(); // Fill square
+                ctx.stroke(); // Draw border
+
+                ctx.fillStyle = "white";
+                ctx.font = "bold 25px Poppins";
+
+                console.log((jsonData.findIndex(item => item.value === value)))
+                if ((jsonData.findIndex(item => item.value === value)) > 1) {
+                    var index = jsonData.findIndex(item => item.name === name);
+
+                    var leftOperand = jsonData[index].value.left.id; // Extracting 'a'
+                    i = jsonData.findIndex(item => item.name === leftOperand)
+                    const number = jsonData[i].value
+                    var operator = jsonData[index].value.op; // Extracting '-'
+                    var rightOperand = jsonData[index].value.right.value; // Extracting '5'
+
+                    if (operator === '-') {
+                        const n = parseInt(number)
+                        const m = parseInt(rightOperand)
+                        mergedString = n - m
+                    }
+                    if (operator === '+') {
+                        const n = parseInt(number)
+                        const m = parseInt(rightOperand)
+                        mergedString = n + m
+                    }
+                    if (operator === '*') {
+                        const n = parseInt(number)
+                        const m = parseInt(rightOperand)
+                        mergedString = n * m
+                    }
+                    if (operator === '/') {
+                        const n = parseInt(number)
+                        const m = parseInt(rightOperand)
+                        mergedString = n / m
+                    }
+
+                    var merged = leftOperand + operator + rightOperand + " = " + mergedString;
+                    ctx.fillText(merged, x + 20, y + 40);
+                }
+                else {
+                    ctx.fillText(value, x + 20, y + 40);
+                }
+
+            }
+
+
+            function drawFunctionSquare(name, x, y) {
+                // Set square properties
+                var squareBorderColor = "#000000"; // Black border color
+                var squareBorderWidth = 2; // Border width
+                var borderRadius = 10; // Border radius for rounded corners
+
+                // Draw square with black border and rounded corners
+                ctx.fillStyle = "#f7b267"; // Fill color
+                ctx.strokeStyle = squareBorderColor; // Border color
+                ctx.lineWidth = squareBorderWidth; // Border width
+                ctx.beginPath();
+                ctx.moveTo(x + borderRadius, y); // Move to top-left corner
+                ctx.lineTo(x + squareWidth - borderRadius, y); // Draw top line
+                ctx.quadraticCurveTo(x + squareWidth, y, x + squareWidth, y + borderRadius); // Draw top-right corner curve
+                ctx.lineTo(x + squareWidth, y + squareHeight - borderRadius); // Draw right line
+                ctx.quadraticCurveTo(x + squareWidth, y + squareHeight, x + squareWidth - borderRadius, y + squareHeight); // Draw bottom-right corner curve
+                ctx.lineTo(x + borderRadius, y + squareHeight); // Draw bottom line
+                ctx.quadraticCurveTo(x, y + squareHeight, x, y + squareHeight - borderRadius); // Draw bottom-left corner curve
+                ctx.lineTo(x, y + borderRadius); // Draw left line
+                ctx.quadraticCurveTo(x, y, x + borderRadius, y); // Draw top-left corner curve
+                ctx.closePath(); // Close path
+                ctx.fill(); // Fill square
+                ctx.stroke(); // Draw border
+
+                // Draw function name
+                ctx.fillStyle = "white";
+                ctx.font = "bold 25px Poppins";
+                ctx.fillText(name, x + 20, y + 40);
+            }
+
+
+            function drawDetailsSquare(details, x, y, color) {
+                // Set square properties
+                var squareBorderColor = "#000000"; // Black border color
+                var squareBorderWidth = 2; // Border width
+                var borderRadius = 10; // Border radius for rounded corners
+                var squareWidth = 650;
+
+                // Draw square with black border and rounded corners
+                ctx.fillStyle = color; // Fill color
+                ctx.strokeStyle = squareBorderColor; // Border color
+                ctx.lineWidth = squareBorderWidth; // Border width
+                ctx.beginPath();
+                ctx.moveTo(x + borderRadius, y); // Move to top-left corner
+                ctx.lineTo(x + squareWidth - borderRadius, y); // Draw top line
+                ctx.quadraticCurveTo(x + squareWidth, y, x + squareWidth, y + borderRadius); // Draw top-right corner curve
+                ctx.lineTo(x + squareWidth, y + squareHeight - borderRadius); // Draw right line
+                ctx.quadraticCurveTo(x + squareWidth, y + squareHeight, x + squareWidth - borderRadius, y + squareHeight); // Draw bottom-right corner curve
+                ctx.lineTo(x + borderRadius, y + squareHeight); // Draw bottom line
+                ctx.quadraticCurveTo(x, y + squareHeight, x, y + squareHeight - borderRadius); // Draw bottom-left corner curve
+                ctx.lineTo(x, y + borderRadius); // Draw left line
+                ctx.quadraticCurveTo(x, y, x + borderRadius, y); // Draw top-left corner curve
+                ctx.closePath(); // Close path
+                ctx.fill(); // Fill square
+                ctx.stroke(); // Draw border
+
+                ctx.fillStyle = "white";
+                ctx.font = "bold 25px Poppins";
+                ctx.fillText(details, x + 20, y + 40);
+            }
+
+            // Draw class squares
+            function drawClassSquare(name, x, y) {
+                // Set square properties
+                var squareBorderColor = "#000000"; // Black border color
+                var squareBorderWidth = 2; // Border width
+                var borderRadius = 10; // Border radius for rounded corners
+
+                // Draw square with black border and rounded corners
+                ctx.fillStyle = "#8c52ff"; // Fill color
+                ctx.strokeStyle = squareBorderColor; // Border color
+                ctx.lineWidth = squareBorderWidth; // Border width
+                ctx.beginPath();
+                ctx.moveTo(x + borderRadius, y); // Move to top-left corner
+                ctx.lineTo(x + squareWidth - borderRadius, y); // Draw top line
+                ctx.quadraticCurveTo(x + squareWidth, y, x + squareWidth, y + borderRadius); // Draw top-right corner curve
+                ctx.lineTo(x + squareWidth, y + squareHeight - borderRadius); // Draw right line
+                ctx.quadraticCurveTo(x + squareWidth, y + squareHeight, x + squareWidth - borderRadius, y + squareHeight); // Draw bottom-right corner curve
+                ctx.lineTo(x + borderRadius, y + squareHeight); // Draw bottom line
+                ctx.quadraticCurveTo(x, y + squareHeight, x, y + squareHeight - borderRadius); // Draw bottom-left corner curve
+                ctx.lineTo(x, y + borderRadius); // Draw left line
+                ctx.quadraticCurveTo(x, y, x + borderRadius, y); // Draw top-left corner curve
+                ctx.closePath(); // Close path
+                ctx.fill(); // Fill square
+                ctx.stroke(); // Draw border
+ 
+                ctx.fillStyle = "white";
+                ctx.font = "bold 25px Poppins";
+                ctx.fillText(name, x + 20, y + 40);
+            }
+
+            // Connect the centers of the squares
+            function connectSquares(x1, y1, x2, y2) {
+                var square1CenterX = (x1 + squareWidth / 2) + 90;
+                var square1CenterY = y1 + squareHeight / 2;
+                var square2CenterX = x2 + squareWidth / 2 - 90;
+                var square2CenterY = y2 + squareHeight / 2;
+
+                ctx.beginPath();
+                ctx.moveTo(square1CenterX, square1CenterY);
+                ctx.lineTo(square2CenterX, square2CenterY);
+                ctx.strokeStyle = "#212529";
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+
+            // Start animation
+            animateAddition(0);
+
+            makeDraggable();
+        };
+    </script>
+</body>
+
+</html>
